@@ -1,6 +1,7 @@
 <?php
-require_once 'db.php';
 require_once 'auth.php';
+require_once 'database/Database.php';
+require_once 'services/UserService.php';
 
 if (!is_logged_in()) {
     header('Location: login.php?redirect=' . urlencode($_SERVER['REQUEST_URI']));
@@ -9,40 +10,32 @@ if (!is_logged_in()) {
 
 $current = $_SESSION['employer_username'] ?? '';
 $admin_user = getenv('EMPLOYER_USER') ?: 'admin';
-// allow only the primary admin (env var) to manage users
 if ($current !== $admin_user) {
     http_response_code(403);
     echo "<p style='padding:2rem;font-family:sans-serif;color:#d8dde1;background:#080a0b'>Forbidden: only the administrator can manage users.</p>";
     exit;
 }
 
+$db = Database::getInstance();
+$pdo = $db->getPdo();
+$userService = new UserService($pdo);
+$userService->ensureUsersTable();
+
 $error = '';
 $success = '';
 
-// ensure users table exists (simple migration)
-$pdo->exec("CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    role TEXT DEFAULT 'user'
-)");
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
-    $role = in_array($_POST['role'] ?? 'user', ['admin','user']) ? $_POST['role'] : 'user';
+    $username = trim((string) ($_POST['username'] ?? ''));
+    $password = (string) ($_POST['password'] ?? '');
+    $role = (string) ($_POST['role'] ?? 'user');
 
-    if ($username === '' || $password === '') {
-        $error = 'Username and password are required.';
-    } else {
-        $hash = password_hash($password, PASSWORD_DEFAULT);
-        try {
-            $stmt = $pdo->prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)');
-            $stmt->execute([$username, $hash, $role]);
-            $success = 'User created successfully.';
-        } catch (PDOException $e) {
-            $error = 'Failed to create user: ' . $e->getMessage();
-        }
+    try {
+        $userService->createUser($username, $password, $role);
+        $success = 'User created successfully.';
+    } catch (InvalidArgumentException $e) {
+        $error = $e->getMessage();
+    } catch (PDOException $e) {
+        $error = 'Failed to create user: ' . $e->getMessage();
     }
 }
 
