@@ -58,24 +58,24 @@ $max_spend = count($top_customers) > 0 ? $top_customers[0]['Total_Spent'] : 1;
     <div class="stats-grid">
       <div class="stat-card highlight">
         <div>
-          <div class="stat-label">Total Revenue</div>
-          <div class="stat-value">UGX <?= number_format($total_revenue, 0) ?></div>
-          <div class="stat-sub"><?= number_format($total_liters, 0) ?> liters sold</div>
+          <div class="stat-label">Revenue</div>
+          <div class="stat-value">UGX <?= number_format($stats['revenue'], 0) ?></div>
+          <div class="stat-sub"><?= number_format($stats['liters'], 0) ?> liters sold</div>
         </div>
         <div class="stat-icon">💰</div>
       </div>
       <div class="stat-card">
         <div>
-          <div class="stat-label">Sales Orders</div>
-          <div class="stat-value"><?= $total_orders ?></div>
-          <div class="stat-sub">Total orders placed</div>
+          <div class="stat-label">Sales This Month</div>
+          <div class="stat-value"><?= $stats['orders'] ?></div>
+          <div class="stat-sub">Orders captured</div>
         </div>
         <div class="stat-icon">📋</div>
       </div>
       <div class="stat-card">
         <div>
           <div class="stat-label">Customers</div>
-          <div class="stat-value"><?= $total_customers ?></div>
+          <div class="stat-value"><?= $stats['customers'] ?></div>
           <div class="stat-sub">Registered accounts</div>
         </div>
         <div class="stat-icon">👥</div>
@@ -83,10 +83,19 @@ $max_spend = count($top_customers) > 0 ? $top_customers[0]['Total_Spent'] : 1;
       <div class="stat-card">
         <div>
           <div class="stat-label">Products</div>
-          <div class="stat-value"><?= $total_products ?></div>
+          <div class="stat-value"><?= $stats['products'] ?></div>
           <div class="stat-sub">Fuel types available</div>
         </div>
         <div class="stat-icon">🛢</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">📊 Business Snapshot</span>
+      </div>
+      <div class="panel-body">
+        <p style="color:var(--text-muted)">This dashboard is now powered by reusable services and is ready for future modules such as payments, inventory, and accounting.</p>
       </div>
     </div>
 
