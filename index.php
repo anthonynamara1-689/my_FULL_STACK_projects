@@ -2,63 +2,18 @@
 require_once 'auth.php';
 require_login();
 $page = 'dashboard';
-require 'db.php';
+require_once 'database/Database.php';
+require_once 'services/DashboardService.php';
 
-// ── KPI QUERIES ──────────────────────────────────
-$total_customers = $pdo->query("SELECT COUNT(*) FROM Customers")->fetchColumn();
-$total_products  = $pdo->query("SELECT COUNT(*) FROM Products")->fetchColumn();
-$total_orders    = $pdo->query("SELECT COUNT(*) FROM SalesOrders")->fetchColumn();
-$total_revenue   = $pdo->query(
-    "SELECT COALESCE(SUM(O.QuantityLiters * P.UnitPrice), 0)
-     FROM SalesOrders O JOIN Products P ON O.ProductID = P.ProductID"
-)->fetchColumn();
-$total_liters    = $pdo->query("SELECT COALESCE(SUM(QuantityLiters),0) FROM SalesOrders")->fetchColumn();
+$db = Database::getInstance();
+$pdo = $db->getPdo();
+$dashboardService = new DashboardService($pdo);
 
-// ── RECENT ORDERS ─────────────────────────────────
-$recent_orders = $pdo->query(
-    "SELECT O.OrderID, O.OrderDate, ROUND(O.QuantityLiters,0) AS QuantityLiters,
-            C.CustomerName, P.FuelType,
-            ROUND(O.QuantityLiters * P.UnitPrice, 2) AS TotalAmount
-     FROM SalesOrders O
-     JOIN Customers C ON O.CustomerID = C.CustomerID
-     JOIN Products  P ON O.ProductID  = P.ProductID
-     ORDER BY O.OrderDate DESC LIMIT 5"
-)->fetchAll();
-
-// ── TOP CUSTOMERS BY SPEND ────────────────────────
-$top_customers = $pdo->query(
-    "SELECT C.CustomerName,
-            ROUND(SUM(O.QuantityLiters * P.UnitPrice), 2) AS Total_Spent,
-            COUNT(O.OrderID) AS Orders
-     FROM SalesOrders O
-     JOIN Customers C ON O.CustomerID = C.CustomerID
-     JOIN Products  P ON O.ProductID  = P.ProductID
-     GROUP BY C.CustomerID, C.CustomerName
-     ORDER BY Total_Spent DESC LIMIT 5"
-)->fetchAll();
-
-// ── SALES BY FUEL TYPE ────────────────────────────
-$fuel_sales = $pdo->query(
-    "SELECT P.FuelType,
-            ROUND(SUM(O.QuantityLiters), 0) AS Total_Liters_Sold,
-            COUNT(O.OrderID)               AS Number_of_Orders
-     FROM SalesOrders O JOIN Products P ON O.ProductID = P.ProductID
-     GROUP BY P.FuelType ORDER BY Total_Liters_Sold DESC"
-)->fetchAll();
-
-// ── CUSTOMERS OVER 80% CREDIT LIMIT ──────────────
-$over_limit = $pdo->query(
-    "SELECT CustomerName, CreditLimit,
-            (SELECT COALESCE(SUM(O.QuantityLiters * P.UnitPrice),0)
-             FROM SalesOrders O
-             JOIN Products P ON O.ProductID = P.ProductID
-             WHERE O.CustomerID = Customers.CustomerID) AS Current_Debt
-     FROM Customers
-     WHERE (SELECT COALESCE(SUM(O.QuantityLiters * P.UnitPrice),0)
-            FROM SalesOrders O
-            JOIN Products P ON O.ProductID = P.ProductID
-            WHERE O.CustomerID = Customers.CustomerID) > (0.8 * CreditLimit)"
-)->fetchAll();
+$stats = $dashboardService->getDashboardStats();
+$recent_orders = $dashboardService->getRecentOrders();
+$top_customers = $dashboardService->getTopCustomers();
+$fuel_sales = $dashboardService->getFuelSales();
+$over_limit = $dashboardService->getCreditAlertCustomers();
 
 $max_spend = count($top_customers) > 0 ? $top_customers[0]['Total_Spent'] : 1;
 ?>

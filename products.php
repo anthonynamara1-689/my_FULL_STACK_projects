@@ -2,85 +2,59 @@
 require_once 'auth.php';
 require_login();
 $page = 'products';
-require 'db.php';
+require_once 'database/Database.php';
+require_once 'services/ProductService.php';
+
+$db = Database::getInstance();
+$pdo = $db->getPdo();
+$productService = new ProductService($pdo);
 
 $msg = '';
 $msg_type = '';
 
-// ── HANDLE POST ACTIONS ────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ADD PRODUCT
-    if ($action === 'add') {
-        $fuel  = trim($_POST['FuelType']  ?? '');
-        $price = trim($_POST['UnitPrice'] ?? '0');
-
-        if ($fuel === '') {
-            $msg = 'Fuel type is required.';
-            $msg_type = 'danger';
-        } else {
-            $pdo->prepare("INSERT INTO Products (FuelType, UnitPrice) VALUES (?, ?)")
-                ->execute([$fuel, $price]);
+    try {
+        if ($action === 'add') {
+            $productService->createProduct([
+                'FuelType' => $_POST['FuelType'] ?? '',
+                'UnitPrice' => $_POST['UnitPrice'] ?? 0,
+            ]);
             header('Location: products.php?success=added');
             exit;
         }
-    }
 
-    // EDIT PRODUCT
-    if ($action === 'edit') {
-        $id    = (int)($_POST['ProductID'] ?? 0);
-        $fuel  = trim($_POST['FuelType']   ?? '');
-        $price = trim($_POST['UnitPrice']  ?? '0');
-
-        if ($id && $fuel !== '') {
-            $pdo->prepare("UPDATE Products SET FuelType=?, UnitPrice=? WHERE ProductID=?")
-                ->execute([$fuel, $price, $id]);
+        if ($action === 'edit') {
+            $productService->updateProduct((int) ($_POST['ProductID'] ?? 0), [
+                'FuelType' => $_POST['FuelType'] ?? '',
+                'UnitPrice' => $_POST['UnitPrice'] ?? 0,
+            ]);
             header('Location: products.php?success=updated');
             exit;
-        } else {
-            $msg = 'Fuel type is required.';
-            $msg_type = 'danger';
         }
-    }
 
-    // DELETE PRODUCT
-    if ($action === 'delete') {
-        $id = (int)($_POST['ProductID'] ?? 0);
-        if ($id) {
-            $in_use = $pdo->prepare("SELECT COUNT(*) FROM SalesOrders WHERE ProductID=?");
-            $in_use->execute([$id]);
-            if ($in_use->fetchColumn() > 0) {
-                $msg = 'Cannot delete: this product is referenced in existing sales orders.';
-                $msg_type = 'danger';
-            } else {
-                $pdo->prepare("DELETE FROM Products WHERE ProductID=?")->execute([$id]);
-                header('Location: products.php?success=deleted');
-                exit;
-            }
+        if ($action === 'delete') {
+            $productService->deleteProduct((int) ($_POST['ProductID'] ?? 0));
+            header('Location: products.php?success=deleted');
+            exit;
         }
+    } catch (InvalidArgumentException $e) {
+        $msg = $e->getMessage();
+        $msg_type = 'danger';
+    } catch (RuntimeException $e) {
+        $msg = $e->getMessage();
+        $msg_type = 'danger';
     }
 }
 
-// ── SUCCESS MESSAGES ──────────────────────────────
 if (isset($_GET['success'])) {
     $map = ['added' => 'Product added successfully.', 'updated' => 'Product updated.', 'deleted' => 'Product deleted.'];
     $msg = $map[$_GET['success']] ?? '';
     $msg_type = 'success';
 }
 
-// ── FETCH PRODUCTS WITH SALES STATS ───────────────
-$products = $pdo->query(
-    "SELECT P.ProductID, P.FuelType, P.UnitPrice,
-            COUNT(O.OrderID) AS OrderCount,
-            COALESCE(SUM(O.QuantityLiters), 0) AS TotalLiters,
-            COALESCE(SUM(O.QuantityLiters * P.UnitPrice), 0) AS TotalRevenue
-     FROM Products P
-     LEFT JOIN SalesOrders O ON O.ProductID = P.ProductID
-     GROUP BY P.ProductID, P.FuelType, P.UnitPrice
-     ORDER BY P.ProductID ASC"
-)->fetchAll();
-
+$products = $productService->getProducts();
 $fuel_types = ['Jet A1 Fuel','Kerosene','LPG Gas (12kg)','Heavy Fuel Oil (HFO)','Engine Oil - 5W30','Diesel','Petrol','Aviation Gasoline'];
 ?>
 <!DOCTYPE html>

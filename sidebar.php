@@ -14,30 +14,7 @@ require_once 'auth.php';
     </div>
   </div>
 
-  <div class="sidebar-section">
-    <span class="sidebar-label">Overview</span>
-    <a href="index.php" class="nav-item <?= $page === 'dashboard' ? 'active' : '' ?>">
-      <span class="nav-icon">▦</span> Dashboard
-    </a>
-  </div>
-
-  <div class="sidebar-section">
-    <span class="sidebar-label">Records</span>
-    <a href="customers.php" class="nav-item <?= $page === 'customers' ? 'active' : '' ?>">
-      <span class="nav-icon">👥</span> Customers
-    </a>
-    <a href="products.php" class="nav-item <?= $page === 'products' ? 'active' : '' ?>">
-      <span class="nav-icon">🛢</span> Products
-    </a>
-    <?php if (is_logged_in() && (($_SESSION['employer_username'] ?? '') === (getenv('EMPLOYER_USER') ?: 'admin'))): ?>
-      <a href="admin_users.php" class="nav-item <?= $page === 'users' ? 'active' : '' ?>">
-        <span class="nav-icon">👤</span> Users
-      </a>
-    <?php endif; ?>
-    <a href="sales.php" class="nav-item <?= $page === 'sales' ? 'active' : '' ?>">
-      <span class="nav-icon">📋</span> Sales Orders
-    </a>
-  </div>
+  <?php include 'includes/navigation.php'; ?>
 
   <div class="sidebar-footer">
     <p><strong>Group Project — 2025BCS141</strong><br>
