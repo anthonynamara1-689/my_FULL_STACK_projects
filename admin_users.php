@@ -9,8 +9,9 @@ if (!is_logged_in()) {
 }
 
 $current = $_SESSION['employer_username'] ?? '';
+$role = strtolower((string) ($_SESSION['user_role'] ?? ''));
 $admin_user = getenv('EMPLOYER_USER') ?: 'admin';
-if ($current !== $admin_user) {
+if ($role !== 'admin' && $current !== $admin_user) {
     http_response_code(403);
     echo "<p style='padding:2rem;font-family:sans-serif;color:#d8dde1;background:#080a0b'>Forbidden: only the administrator can manage users.</p>";
     exit;

@@ -1,4 +1,10 @@
 <?php
+require_once dirname(__DIR__) . '/auth.php';
+AuthService::startSession();
+
+$isAdmin = strtolower((string) ($_SESSION['user_role'] ?? '')) === 'admin'
+    || (string) ($_SESSION['employer_username'] ?? '') === (getenv('EMPLOYER_USER') ?: 'admin');
+
 $modules = [
     ['label' => 'Dashboard', 'page' => 'dashboard', 'url' => 'index.php', 'icon' => '▦'],
     ['label' => 'Sales', 'page' => 'sales', 'url' => 'sales.php', 'icon' => '📋'],
@@ -7,9 +13,13 @@ $modules = [
     ['label' => 'Products', 'page' => 'products', 'url' => 'products.php', 'icon' => '🛢'],
     ['label' => 'Inventory', 'page' => 'inventory', 'url' => 'inventory.php', 'icon' => '📦'],
     ['label' => 'Reports', 'page' => 'reports', 'url' => 'reports.php', 'icon' => '📈'],
-    ['label' => 'Users', 'page' => 'users', 'url' => 'admin_users.php', 'icon' => '👤'],
-    ['label' => 'Settings', 'page' => 'settings', 'url' => 'settings.php', 'icon' => '⚙️'],
 ];
+
+if ($isAdmin) {
+    $modules[] = ['label' => 'Users', 'page' => 'users', 'url' => 'admin_users.php', 'icon' => '👤'];
+}
+
+$modules[] = ['label' => 'Settings', 'page' => 'settings', 'url' => 'settings.php', 'icon' => '⚙️'];
 ?>
 
 <div class="sidebar-section">

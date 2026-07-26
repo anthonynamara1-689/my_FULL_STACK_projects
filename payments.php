@@ -9,7 +9,29 @@ $db = Database::getInstance();
 $pdo = $db->getPdo();
 $paymentService = new PaymentService($pdo);
 
+$message = '';
+$messageType = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        $paymentService->recordPayment([
+            'CustomerID' => $_POST['CustomerID'] ?? 0,
+            'Amount' => $_POST['Amount'] ?? 0,
+            'PaymentDate' => $_POST['PaymentDate'] ?? date('Y-m-d'),
+        ]);
+        $message = 'Payment recorded successfully.';
+        $messageType = 'success';
+    } catch (InvalidArgumentException $e) {
+        $message = $e->getMessage();
+        $messageType = 'danger';
+    } catch (PDOException $e) {
+        $message = 'Unable to save payment: ' . $e->getMessage();
+        $messageType = 'danger';
+    }
+}
+
 $payments = $paymentService->getPayments();
+$customers = $paymentService->getCustomers();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -30,9 +52,43 @@ $payments = $paymentService->getPayments();
     </div>
   </header>
   <div class="content">
+    <?php if ($message): ?>
+    <div class="alert alert-<?= htmlspecialchars($messageType) ?>"><?= htmlspecialchars($message) ?></div>
+    <?php endif; ?>
+
     <div class="panel">
       <div class="panel-header">
-        <span class="panel-title">💳 Payment History</span>
+        <span class="panel-title">💳 Record a Payment</span>
+      </div>
+      <div class="panel-body">
+        <form method="POST" class="form-row">
+          <div class="form-group">
+            <label class="form-label">Customer</label>
+            <select name="CustomerID" class="form-control" required>
+              <option value="">Select customer</option>
+              <?php foreach ($customers as $customer): ?>
+              <option value="<?= (int) ($customer['CustomerID'] ?? 0) ?>"><?= htmlspecialchars((string) ($customer['CustomerName'] ?? '')) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Amount (UGX)</label>
+            <input class="form-control" type="number" name="Amount" min="1" step="0.01" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Payment Date</label>
+            <input class="form-control" type="date" name="PaymentDate" value="<?= date('Y-m-d') ?>">
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end">
+            <button class="btn btn-primary" type="submit">Save Payment</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">📋 Payment History</span>
       </div>
       <div class="table-wrap">
         <table>
@@ -45,7 +101,7 @@ $payments = $paymentService->getPayments();
             <?php else: foreach ($payments as $payment): ?>
             <tr>
               <td class="td-id">#<?= (int) ($payment['PaymentID'] ?? 0) ?></td>
-              <td class="td-primary"><?= htmlspecialchars((string) ($payment['CustomerID'] ?? '')) ?></td>
+              <td class="td-primary"><?= htmlspecialchars((string) ($payment['CustomerName'] ?? $payment['CustomerID'] ?? '')) ?></td>
               <td class="td-mono">UGX <?= number_format((float) ($payment['Amount'] ?? 0), 0) ?></td>
               <td class="td-mono"><?= htmlspecialchars((string) ($payment['PaymentDate'] ?? '')) ?></td>
             </tr>
