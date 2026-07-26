@@ -2,92 +2,65 @@
 require_once 'auth.php';
 require_login();
 $page = 'sales';
-require 'db.php';
+require_once 'database/Database.php';
+require_once 'services/SalesService.php';
+
+$db = Database::getInstance();
+$pdo = $db->getPdo();
+$salesService = new SalesService($pdo);
 
 $msg = '';
 $msg_type = '';
 
-// ── HANDLE POST ACTIONS ────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ADD ORDER
-    if ($action === 'add') {
-        $customer_id = (int)($_POST['CustomerID']     ?? 0);
-        $product_id  = (int)($_POST['ProductID']      ?? 0);
-        $qty         = trim($_POST['QuantityLiters']  ?? '');
-        $date        = trim($_POST['OrderDate']        ?? date('Y-m-d H:i:s'));
-
-        if (!$customer_id || !$product_id || $qty === '') {
-            $msg = 'Customer, product and quantity are required.';
-            $msg_type = 'danger';
-        } else {
-            $pdo->prepare(
-                "INSERT INTO SalesOrders (CustomerID, ProductID, QuantityLiters, OrderDate) VALUES (?, ?, ?, ?)"
-            )->execute([$customer_id, $product_id, $qty, $date]);
+    try {
+        if ($action === 'add') {
+            $salesService->createSale([
+                'CustomerID' => $_POST['CustomerID'] ?? 0,
+                'ProductID' => $_POST['ProductID'] ?? 0,
+                'QuantityLiters' => $_POST['QuantityLiters'] ?? 0,
+                'OrderDate' => $_POST['OrderDate'] ?? date('Y-m-d H:i:s'),
+            ]);
             header('Location: sales.php?success=added');
             exit;
         }
-    }
 
-    // EDIT ORDER
-    if ($action === 'edit') {
-        $id          = (int)($_POST['OrderID']        ?? 0);
-        $customer_id = (int)($_POST['CustomerID']     ?? 0);
-        $product_id  = (int)($_POST['ProductID']      ?? 0);
-        $qty         = trim($_POST['QuantityLiters']  ?? '');
-        $date        = trim($_POST['OrderDate']        ?? '');
-
-        if ($id && $customer_id && $product_id && $qty !== '') {
-            $pdo->prepare(
-                "UPDATE SalesOrders SET CustomerID=?, ProductID=?, QuantityLiters=?, OrderDate=? WHERE OrderID=?"
-            )->execute([$customer_id, $product_id, $qty, $date, $id]);
+        if ($action === 'edit') {
+            $salesService->updateSale((int) ($_POST['OrderID'] ?? 0), [
+                'CustomerID' => $_POST['CustomerID'] ?? 0,
+                'ProductID' => $_POST['ProductID'] ?? 0,
+                'QuantityLiters' => $_POST['QuantityLiters'] ?? 0,
+                'OrderDate' => $_POST['OrderDate'] ?? '',
+            ]);
             header('Location: sales.php?success=updated');
             exit;
-        } else {
-            $msg = 'All fields are required.';
-            $msg_type = 'danger';
         }
-    }
 
-    // DELETE ORDER
-    if ($action === 'delete') {
-        $id = (int)($_POST['OrderID'] ?? 0);
-        if ($id) {
-            $pdo->prepare("DELETE FROM SalesOrders WHERE OrderID=?")->execute([$id]);
+        if ($action === 'delete') {
+            $salesService->deleteSale((int) ($_POST['OrderID'] ?? 0));
             header('Location: sales.php?success=deleted');
             exit;
         }
+    } catch (InvalidArgumentException $e) {
+        $msg = $e->getMessage();
+        $msg_type = 'danger';
     }
 }
 
-// ── SUCCESS MESSAGES ──────────────────────────────
 if (isset($_GET['success'])) {
     $map = ['added' => 'Order placed successfully.', 'updated' => 'Order updated.', 'deleted' => 'Order deleted.'];
     $msg = $map[$_GET['success']] ?? '';
     $msg_type = 'success';
 }
 
-// ── FETCH ALL ORDERS ──────────────────────────────
-$orders = $pdo->query(
-    "SELECT O.OrderID, O.OrderDate, ROUND(O.QuantityLiters, 2) AS QuantityLiters,
-            O.CustomerID, O.ProductID,
-            C.CustomerName, P.FuelType, P.UnitPrice,
-            ROUND(O.QuantityLiters * P.UnitPrice, 2) AS TotalAmount
-     FROM SalesOrders O
-     JOIN Customers C ON O.CustomerID = C.CustomerID
-     JOIN Products  P ON O.ProductID  = P.ProductID
-     ORDER BY O.OrderDate DESC, O.OrderID DESC"
-)->fetchAll();
-
-// ── DROPDOWN DATA ─────────────────────────────────
-$customers = $pdo->query("SELECT CustomerID, CustomerName FROM Customers ORDER BY CustomerName")->fetchAll();
-$products  = $pdo->query("SELECT ProductID, FuelType, UnitPrice FROM Products ORDER BY FuelType")->fetchAll();
-
-// ── ORDER STATS ───────────────────────────────────
-$total_revenue  = array_sum(array_column($orders, 'TotalAmount'));
-$total_liters   = array_sum(array_column($orders, 'QuantityLiters'));
-$large_orders   = array_filter($orders, fn($o) => $o['QuantityLiters'] >= 10000);
+$orders = $salesService->getSales();
+$customers = $pdo->query('SELECT CustomerID, CustomerName FROM Customers ORDER BY CustomerName')->fetchAll();
+$products = $pdo->query('SELECT ProductID, FuelType, UnitPrice FROM Products ORDER BY FuelType')->fetchAll();
+$total_revenue = array_sum(array_column($orders, 'TotalAmount'));
+$total_liters = array_sum(array_column($orders, 'QuantityLiters'));
+$large_orders = array_filter($orders, fn($o) => $o['QuantityLiters'] >= 10000);
 ?>
 <!DOCTYPE html>
 <html lang="en">
