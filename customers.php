@@ -2,91 +2,63 @@
 require_once 'auth.php';
 require_login();
 $page = 'customers';
-require 'db.php';
+require_once 'database/Database.php';
+require_once 'services/CustomerService.php';
+
+$db = Database::getInstance();
+$pdo = $db->getPdo();
+$customerService = new CustomerService($pdo);
 
 $msg = '';
 $msg_type = '';
 
-// ── HANDLE POST ACTIONS ────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    // ADD CUSTOMER
-    if ($action === 'add') {
-        $name  = trim($_POST['CustomerName'] ?? '');
-        $addr  = trim($_POST['Address'] ?? '');
-        $limit = trim($_POST['CreditLimit'] ?? '0');
-
-        if ($name === '') {
-            $msg = 'Customer name is required.';
-            $msg_type = 'danger';
-        } else {
-            $stmt = $pdo->prepare(
-                "INSERT INTO Customers (CustomerName, Address, CreditLimit) VALUES (?, ?, ?)"
-            );
-            $stmt->execute([$name, $addr, $limit]);
+    try {
+        if ($action === 'add') {
+            $customerService->createCustomer([
+                'CustomerName' => $_POST['CustomerName'] ?? '',
+                'Address' => $_POST['Address'] ?? '',
+                'CreditLimit' => $_POST['CreditLimit'] ?? 0,
+            ]);
             header('Location: customers.php?success=added');
             exit;
         }
-    }
 
-    // EDIT CUSTOMER
-    if ($action === 'edit') {
-        $id    = (int)($_POST['CustomerID'] ?? 0);
-        $name  = trim($_POST['CustomerName'] ?? '');
-        $addr  = trim($_POST['Address'] ?? '');
-        $limit = trim($_POST['CreditLimit'] ?? '0');
-
-        if ($id && $name !== '') {
-            $stmt = $pdo->prepare(
-                "UPDATE Customers SET CustomerName=?, Address=?, CreditLimit=? WHERE CustomerID=?"
-            );
-            $stmt->execute([$name, $addr, $limit, $id]);
+        if ($action === 'edit') {
+            $id = (int) ($_POST['CustomerID'] ?? 0);
+            $customerService->updateCustomer($id, [
+                'CustomerName' => $_POST['CustomerName'] ?? '',
+                'Address' => $_POST['Address'] ?? '',
+                'CreditLimit' => $_POST['CreditLimit'] ?? 0,
+            ]);
             header('Location: customers.php?success=updated');
             exit;
-        } else {
-            $msg = 'Customer name is required.';
-            $msg_type = 'danger';
         }
-    }
 
-    // DELETE CUSTOMER
-    if ($action === 'delete') {
-        $id = (int)($_POST['CustomerID'] ?? 0);
-        if ($id) {
-            // Check if customer has orders
-            $has_orders = $pdo->prepare("SELECT COUNT(*) FROM SalesOrders WHERE CustomerID=?");
-            $has_orders->execute([$id]);
-            if ($has_orders->fetchColumn() > 0) {
-                $msg = 'Cannot delete: this customer has existing sales orders.';
-                $msg_type = 'danger';
-            } else {
-                $pdo->prepare("DELETE FROM Customers WHERE CustomerID=?")->execute([$id]);
-                header('Location: customers.php?success=deleted');
-                exit;
-            }
+        if ($action === 'delete') {
+            $id = (int) ($_POST['CustomerID'] ?? 0);
+            $customerService->deleteCustomer($id);
+            header('Location: customers.php?success=deleted');
+            exit;
         }
+    } catch (InvalidArgumentException $e) {
+        $msg = $e->getMessage();
+        $msg_type = 'danger';
+    } catch (RuntimeException $e) {
+        $msg = $e->getMessage();
+        $msg_type = 'danger';
     }
 }
 
-// ── SUCCESS MESSAGES ──────────────────────────────
 if (isset($_GET['success'])) {
     $map = ['added' => 'Customer added successfully.', 'updated' => 'Customer updated.', 'deleted' => 'Customer deleted.'];
     $msg = $map[$_GET['success']] ?? '';
     $msg_type = 'success';
 }
 
-// ── FETCH ALL CUSTOMERS ───────────────────────────
-$customers = $pdo->query(
-    "SELECT C.CustomerID, C.CustomerName, C.Address, C.CreditLimit,
-            COUNT(O.OrderID) AS OrderCount,
-            COALESCE(SUM(O.QuantityLiters * P.UnitPrice), 0) AS Total_Spent
-     FROM Customers C
-     LEFT JOIN SalesOrders O ON O.CustomerID = C.CustomerID
-     LEFT JOIN Products P ON P.ProductID = O.ProductID
-     GROUP BY C.CustomerID, C.CustomerName, C.Address, C.CreditLimit
-     ORDER BY C.CustomerID ASC"
-)->fetchAll();
+$customers = $customerService->getCustomers();
 ?>
 <!DOCTYPE html>
 <html lang="en">
