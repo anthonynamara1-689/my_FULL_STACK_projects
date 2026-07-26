@@ -51,7 +51,8 @@ body {
 /* ─── SIDEBAR ─── */
 .sidebar {
   width: var(--sidebar-w);
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
@@ -59,7 +60,16 @@ body {
   position: fixed;
   top: 0; left: 0;
   z-index: 200;
+  overflow: hidden;
+}
+
+.sidebar-scroll {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sidebar-logo {
